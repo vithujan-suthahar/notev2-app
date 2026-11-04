@@ -18,28 +18,50 @@ Eine Fullstack-Webanwendung zum Erstellen und Verwalten von Notizen mit Benutzer
 ## Tech Stack
 
 **Backend**
-- Java 25, Spring Boot 4, Spring Security
-- JWT (JSON Web Token)
+- Java 25, Spring Boot 4, Spring Security (JWT)
+- PostgreSQL, JPA / Hibernate, Flyway (Datenbankmigrationen)
+- Bean Validation, zentrale Fehlerbehandlung (GlobalExceptionHandler)
 - Bucket4j (Rate Limiting)
-- PostgreSQL, JPA / Hibernate
 
 **Frontend**
 - React, Vite
 - Axios, Tailwind CSS
 
+**Qualität & Betrieb**
+- JUnit, Mockito, Integrationstests mit H2
+- Docker / Docker Compose
+- GitHub Actions (CI/CD)
+- Terraform, Azure Container Apps, PostgreSQL Flexible Server
+
+---
+
+## Architektur & Qualität
+
+- Schichtentrennung: Controller → Service → Repository
+- Eingaben werden über DTOs mit Bean Validation geprüft
+- Einheitliche Fehlerantworten über einen zentralen GlobalExceptionHandler
+- Schemaänderungen laufen versioniert über Flyway-Migrationen
+- Unit-Tests (JUnit, Mockito) und Integrationstests gegen H2
+
 ---
 
 ## Projektstruktur
 
+```
 notev2/
+├── .github/workflows/     CI/CD (GitHub Actions)
+├── docs/                  Screenshots
+├── infra/                 Terraform (Azure)
 ├── notev2-backend/
 │   ├── src/
 │   └── pom.xml
 ├── notev2-frontend/
 │   ├── src/
 │   └── package.json
+├── compose.yml
 ├── load-test.js
 └── README.md
+```
 
 ---
 
@@ -47,9 +69,17 @@ notev2/
 
 **1. Backend starten**
 
+Linux / macOS:
 ```bash
 cd notev2-backend
-$env:JWT_SECRET="your_secret_here"  
+export JWT_SECRET="your_secret_here"
+./mvnw spring-boot:run
+```
+
+Windows (PowerShell):
+```powershell
+cd notev2-backend
+$env:JWT_SECRET="your_secret_here"
 ./mvnw spring-boot:run
 ```
 
@@ -63,8 +93,7 @@ npm run dev
 
 **Environment Variablen**
 
-Erstelle eine `.env` Datei im Backend-Ordner (nicht committen):
-JWT_SECRET=your_super_secret_key_mindestens_32_zeichen_lang
+`JWT_SECRET` muss mindestens 32 Zeichen lang sein. Secrets niemals committen.
 
 ---
 
@@ -72,11 +101,11 @@ JWT_SECRET=your_super_secret_key_mindestens_32_zeichen_lang
 
 **Auth**
 
-| Methode | Endpoint         | Beschreibung              |
-|---------|------------------|---------------------------|
-| POST    | /auth/register   | Benutzer registrieren     |
+| Methode | Endpoint         | Beschreibung                        |
+|---------|------------------|-------------------------------------|
+| POST    | /auth/register   | Benutzer registrieren               |
 | POST    | /auth/login      | Login + JWT erhalten (rate-limited) |
-| GET     | /auth/me         | Aktueller Benutzer        |
+| GET     | /auth/me         | Aktueller Benutzer                  |
 
 **Notes**
 
@@ -95,6 +124,14 @@ JWT_SECRET=your_super_secret_key_mindestens_32_zeichen_lang
 - Geschützte Routen via Spring Security
 - Rate Limiting (Token-Bucket-Algorithmus, Bucket4j) auf `/auth/login` und `/auth/register`, um Brute-Force-Angriffe zu erschweren
 - Secrets werden über Environment Variablen verwaltet
+
+---
+
+## CI/CD & Infrastruktur
+
+- Build und Deployment laufen über GitHub Actions
+- Die Azure-Infrastruktur (Container Apps für Backend und Frontend, PostgreSQL Flexible Server) wird per Terraform bereitgestellt
+- Lokale Entwicklungsumgebung mit Docker Compose
 
 ---
 
@@ -146,40 +183,35 @@ k6 run load-test.js
 
 ## Deployment (Azure)
 
-Die App wurde erfolgreich auf Azure Container Apps deployed (Backend, Frontend, PostgreSQL Flexible Server), provisioniert via Terraform.
+Die App wurde auf Azure Container Apps deployed (Backend, Frontend, PostgreSQL Flexible Server), provisioniert via Terraform.
 
 ![Login Screen](docs/login_default.png)
 ![Login Error Screen](docs/login_error.png)
 
-![Regristrieren Screen](docs/registrieren_default.png)
-![Regristrieren Error Screen](docs/registrieren_error.png)
+![Registrieren Screen](docs/registrieren_default.png)
+![Registrieren Error Screen](docs/registrieren_error.png)
 
 ![RateLimit Error Screen](docs/rate_limit_error.png)
 
 ![Notes App](docs/notes.png)
-![Azure Resources](docs/azure_dashboardpng)
----
+![Azure Resources](docs/azure_dashboard.png)
 
 ### Beobachtungen beim Cloud-Loadtest
 
 ![CPU Usage AVG](docs/cloud_load_test.png)
 
-- Cold Start (min_replicas=0): Erster Request nach Idle-Zeit ~45s Latenz, 
-  danach (warmer Container) ~109ms avg – klassischer Scale-to-Zero-Tradeoff.
-- Rate Limiting funktioniert grundsätzlich, aber hinter Azures Reverse Proxy 
-  liefert request.getRemoteAddr() die Proxy-IP statt der echten Client-IP – 
-  alle Anfragen teilen sich effektiv denselben Bucket. Fix: Auswertung des 
-  X-Forwarded-For-Headers (geplante Erweiterung).
-
+- Cold Start (min_replicas=0): Erster Request nach Idle-Zeit ~45 s Latenz, danach (warmer Container) ~109 ms avg – klassischer Scale-to-Zero-Tradeoff.
+- Rate Limiting funktioniert grundsätzlich, aber hinter Azures Reverse Proxy liefert `request.getRemoteAddr()` die Proxy-IP statt der echten Client-IP – alle Anfragen teilen sich effektiv denselben Bucket. Fix: Auswertung des `X-Forwarded-For`-Headers (geplante Erweiterung).
 
 ---
+
 ## Geplante Erweiterungen
 
 - Notizen bearbeiten
+- `X-Forwarded-For`-Auswertung für Rate Limiting hinter dem Azure-Proxy
+- Redis-backed Rate Limiting für horizontale Skalierung
 - Dark Mode
 - Responsives Design verbessern
-- Azure-Deployment mit Bicep/Terraform
-- Redis-backed Rate Limiting für horizontale Skalierung
 
 ---
 
