@@ -22,6 +22,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         Bandwidth limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build();
         return Bucket.builder().addLimit(limit).build();
     }
+    private String resolveClientIp(HttpServletRequest request) {
+    String forwardedFor = request.getHeader("X-Forwarded-For");
+    if (forwardedFor != null && !forwardedFor.isBlank()) {
+        // Format: "client, proxy1, proxy2" - erster Eintrag = ursprünglicher Client
+        String[] ips =  forwardedFor.split(",");
+        return ips[ips.length-1].trim();
+    }
+    return request.getRemoteAddr();
+}
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -36,9 +45,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                      HttpServletResponse response,
-                                     FilterChain filterChain) throws ServletException, IOException {
-       // System.out.println("RateLimitFilter läuft");                                
-        String ip = request.getRemoteAddr();
+                                     FilterChain filterChain) throws ServletException, IOException {                          
+        String ip = resolveClientIp(request);
         Bucket bucket = buckets.computeIfAbsent(ip, k -> newBucket());
 
         if (bucket.tryConsume(1)) {
