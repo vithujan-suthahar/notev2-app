@@ -4,9 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -117,4 +119,114 @@ public class RefreshTokenServiceTest {
         assertNotEquals(rawToken, savedHash);
         assertEquals(expectedHash, savedHash);
     }
+
+    @Test
+    void validateRefreshToken_shouldReturnToken_whenTokenIsValid() throws NoSuchAlgorithmException {
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        User user = new User();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(tokenHash);
+        refreshToken.setCreatedAt(Instant.now());
+        refreshToken.setExpiresAt(Instant.now().plus(Duration.ofDays(7)));
+        refreshToken.setRevokedAt(null);
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.of(refreshToken));
+
+        RefreshToken result = refreshTokenService.validateRefreshToken(rawToken);
+
+        assertEquals(refreshToken, result);
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+
+    }
+
+    @Test
+    void validateRefreshToken_shouldThrowException_whenTokenNotFound()
+            throws NoSuchAlgorithmException {
+
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.empty());
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.validateRefreshToken(rawToken));
+
+        assertEquals("Refresh Token nicht gefunden", ex.getMessage());
+
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+    }
+
+    @Test
+    void validateRefreshToken_shouldThrowException_whenTokenExpired() throws NoSuchAlgorithmException {
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        User user = new User();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(tokenHash);
+        refreshToken.setCreatedAt(Instant.now());
+        refreshToken.setExpiresAt(Instant.now().minus(Duration.ofDays(1)));
+        refreshToken.setRevokedAt(null);
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.of(refreshToken));
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.validateRefreshToken(rawToken));
+
+        assertEquals("Refresh Token ist abgelaufen", ex.getMessage());
+
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+
+    }
+
+    @Test
+    void validateRefreshToken_shouldThrowException_whenTokenRevoked() throws NoSuchAlgorithmException {
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        User user = new User();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(tokenHash);
+        refreshToken.setCreatedAt(Instant.now());
+        refreshToken.setExpiresAt(Instant.now().plus(Duration.ofDays(7)));
+        refreshToken.setRevokedAt(Instant.now());
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.of(refreshToken));
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.validateRefreshToken(rawToken));
+
+        assertEquals("Refresh Token wurde widerrufen", ex.getMessage());
+
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+
+    }
+
 }
