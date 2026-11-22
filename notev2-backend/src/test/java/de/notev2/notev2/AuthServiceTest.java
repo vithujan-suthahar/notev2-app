@@ -18,9 +18,11 @@ import de.notev2.notev2.config.CustomUserDetailsService;
 import de.notev2.notev2.config.JwtUtil;
 import de.notev2.notev2.dto.AuthLoginRequest;
 import de.notev2.notev2.dto.AuthRegisterRequest;
+import de.notev2.notev2.dto.AuthResponse;
 import de.notev2.notev2.entity.User;
 import de.notev2.notev2.repos.UserRepository;
 import de.notev2.notev2.service.AuthService;
+import de.notev2.notev2.service.RefreshTokenService;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -33,6 +35,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtUtil jwtUtil;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @Mock
     private CustomUserDetailsService userDetailsService; // ← fehlt, hinzufügen
@@ -49,7 +54,7 @@ class AuthServiceTest {
         AuthRegisterRequest user = new AuthRegisterRequest();
         user.setUsername("deniz");
         user.setPassword("123");
-        
+
         when(userRepository.findByUsername("deniz")).thenReturn(null);
         when(passwordEncoder.encode("123")).thenReturn("hashed_123");
 
@@ -78,7 +83,6 @@ class AuthServiceTest {
         verify(userRepository, never()).save(any());
     }
 
-
     // =========================
     // LOGIN TESTS
     // =========================
@@ -95,18 +99,21 @@ class AuthServiceTest {
         dbUser.setAdmin(false); // ← hinzufügen
 
         UserDetails userDetails = org.springframework.security.core.userdetails.User
-            .withUsername("deniz")
-            .password("hashed_password")
-            .authorities(new SimpleGrantedAuthority("ROLE_USER"))
-            .build();
+                .withUsername("deniz")
+                .password("hashed_password")
+                .authorities(new SimpleGrantedAuthority("ROLE_USER"))
+                .build();
 
         when(userRepository.findByUsername("deniz")).thenReturn(dbUser);
         when(passwordEncoder.matches("123", "hashed_password")).thenReturn(true);
         when(userDetailsService.loadUserByUsername("deniz")).thenReturn(userDetails); // ← neu
-        when(jwtUtil.generateToken(any(UserDetails.class))).thenReturn("test_token");
+        when(jwtUtil.generateToken(any(UserDetails.class))).thenReturn("test_access_token");
+        when(refreshTokenService.createRefreshToken(dbUser)).thenReturn("test_refresh_token");
 
-        String result = authService.login(requestUser);
-        assertEquals("test_token", result);
+        AuthResponse result = authService.login(requestUser);
+        assertEquals("test_access_token", result.getAccessToken());
+        assertEquals("test_refresh_token", result.getRefreshToken());
+        verify(refreshTokenService).createRefreshToken(dbUser);
     }
 
     @Test
@@ -178,6 +185,5 @@ class AuthServiceTest {
 
         assertEquals("Benutzername oder Passwort falsch", exception.getMessage());
     }
-
 
 }

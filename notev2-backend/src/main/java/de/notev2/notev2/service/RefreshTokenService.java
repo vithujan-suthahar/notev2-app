@@ -10,9 +10,11 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import de.notev2.notev2.entity.RefreshToken;
 import de.notev2.notev2.entity.User;
+import de.notev2.notev2.exception.InvalidRefreshTokenException;
 import de.notev2.notev2.repos.RefreshTokenRepository;
 
 @Service
@@ -24,7 +26,7 @@ public class RefreshTokenService {
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    private String hashToken(String rawToken) {
+    public String hashToken(String rawToken) {
         try {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256")
@@ -60,15 +62,14 @@ public class RefreshTokenService {
         String tokenHash = hashToken(rawToken);
 
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new IllegalStateException("Refresh Token nicht gefunden"));
-
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh Token nicht gefunden"));
 
         if (!refreshToken.getExpiresAt().isAfter(Instant.now())) {
-            throw new IllegalStateException("Refresh Token ist abgelaufen");
+            throw new InvalidRefreshTokenException("Refresh Token ist abgelaufen");
         }
 
         if (refreshToken.getRevokedAt() != null) {
-            throw new IllegalStateException("Refresh Token wurde widerrufen");
+            throw new InvalidRefreshTokenException("Refresh Token wurde widerrufen");
         }
 
         return refreshToken;
@@ -78,13 +79,27 @@ public class RefreshTokenService {
         String tokenHash = hashToken(rawToken);
 
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new IllegalStateException("Refresh Token nicht gefunden"));
-        
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh Token nicht gefunden"));
+
+        if (refreshToken.getRevokedAt() != null) {
+            throw new InvalidRefreshTokenException("Refresh Token wurde bereits widerrufen");
+        }
+
         refreshToken.setRevokedAt(Instant.now());
 
         refreshTokenRepository.save(refreshToken);
-        
+
     }
 
+    @Transactional
+    public String rotateRefreshToken(RefreshToken refreshToken) {
+
+        User user = refreshToken.getUser();
+
+        refreshToken.setRevokedAt(Instant.now());
+        refreshTokenRepository.save(refreshToken);
+
+        return createRefreshToken(user);
+    }
 
 }
