@@ -74,4 +74,17 @@ public class RefreshTokenService {
         return refreshToken;
     }
 
+    public void revokeRefreshToken(String rawToken) {
+        String tokenHash = hashToken(rawToken);
+
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new IllegalStateException("Refresh Token nicht gefunden"));
+        
+        refreshToken.setRevokedAt(Instant.now());
+
+        refreshTokenRepository.save(refreshToken);
+        
+    }
+
+
 }
