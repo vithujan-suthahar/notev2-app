@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -226,6 +228,59 @@ public class RefreshTokenServiceTest {
         assertEquals("Refresh Token wurde widerrufen", ex.getMessage());
 
         verify(refreshTokenRepository).findByTokenHash(tokenHash);
+
+    }
+
+    @Test
+    void revokeRefreshToken_shouldSetRevokedAt_whenTokenExists() throws NoSuchAlgorithmException {
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        User user = new User();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(tokenHash);
+        refreshToken.setCreatedAt(Instant.now());
+        refreshToken.setExpiresAt(Instant.now().plus(Duration.ofDays(7)));
+        refreshToken.setRevokedAt(null);
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.of(refreshToken));
+        
+        refreshTokenService.revokeRefreshToken(rawToken);
+
+        assertNotNull(refreshToken.getRevokedAt());
+
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+        verify(refreshTokenRepository).save(refreshToken);
+
+    }
+
+    @Test
+    void revokeRefreshToken_shouldThrowException_whenTokenNotFound() throws NoSuchAlgorithmException {
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+        MessageDigest.getInstance("SHA-256")
+                .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.empty());
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> refreshTokenService.revokeRefreshToken(rawToken));
+
+        assertEquals("Refresh Token nicht gefunden", ex.getMessage());
+
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+
+        
 
     }
 
