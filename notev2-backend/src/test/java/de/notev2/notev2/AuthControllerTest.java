@@ -10,8 +10,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional; // WICHTIG!
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import de.notev2.notev2.entity.RefreshToken;
 import de.notev2.notev2.entity.User;
 import de.notev2.notev2.repos.RefreshTokenRepository;
@@ -28,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -54,10 +53,8 @@ public class AuthControllerTest {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     @Test
-    void login_shouldReturnTokens() throws Exception {
+    void login_shouldReturnAccessTokenAndRefreshTokenCookie() throws Exception {
 
         User user = new User();
         user.setUsername("deniz");
@@ -75,9 +72,11 @@ public class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists())
-                .andExpect(jsonPath("$.message").value("Login erfolgreich"));
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.message").value("Login erfolgreich"))
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
     }
 
     @Test
@@ -372,28 +371,24 @@ public class AuthControllerTest {
     }
 
     @Test
-    void refreshToken_shouldReturnOk() throws Exception {
+    void refreshToken_shouldReturnNewAccessTokenAndCookie() throws Exception {
 
         User user = new User();
         user.setUsername("deniz");
         user.setPassword(passwordEncoder.encode("123"));
         userRepository.save(user);
 
-        String refreshToken = refreshTokenService.createRefreshToken(user);
-
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(refreshToken);
+        String rawToken = refreshTokenService.createRefreshToken(user);
 
         mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists())
-                .andExpect(jsonPath("$.message").value("Token erneuert"));
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").value(
+                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.message").value("Token erneuert"))
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
     }
 
     @Test
@@ -412,16 +407,10 @@ public class AuthControllerTest {
         token.setExpiresAt(Instant.now().minus(Duration.ofDays(1)));
         refreshTokenRepository.save(token);
 
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
         mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
+
         assertNull(token.getRevokedAt());
         assertEquals(1, refreshTokenRepository.count());
     }
@@ -442,17 +431,10 @@ public class AuthControllerTest {
         token.setRevokedAt(Instant.now());
         refreshTokenRepository.save(token);
 
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
         Instant revokedAt = token.getRevokedAt();
 
         mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
 
         assertEquals(revokedAt, token.getRevokedAt());
@@ -464,16 +446,11 @@ public class AuthControllerTest {
 
         String rawToken = "test-raw-token";
 
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
         mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
+
+        assertEquals(0, refreshTokenRepository.count());
     }
 
     @Test
@@ -488,19 +465,15 @@ public class AuthControllerTest {
 
         String hash = refreshTokenService.hashToken(rawToken);
 
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
         MvcResult result = mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").value(
+                        org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.message").value("Token erneuert"))
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().httpOnly("refreshToken", true))
                 .andReturn();
 
         RefreshToken oldToken = refreshTokenRepository.findByTokenHash(hash)
@@ -508,9 +481,9 @@ public class AuthControllerTest {
 
         assertNotNull(oldToken.getRevokedAt());
 
-        String responseBody = result.getResponse().getContentAsString();
-        String newRawToken = objectMapper.readTree(responseBody)
-                .get("refreshToken").asText();
+        String newRawToken = result.getResponse()
+                .getCookie("refreshToken")
+                .getValue();
 
         assertEquals(2, refreshTokenRepository.count());
 
@@ -525,29 +498,26 @@ public class AuthControllerTest {
     }
 
     @Test
-    void logout_shouldRevokeRefreshToken_whenTokenIsValid() throws Exception {
+    void logout_shouldRevokeRefreshTokenAndDeleteCookie_whenTokenIsValid() throws Exception {
+
         User user = new User();
         user.setUsername("deniz");
         user.setPassword(passwordEncoder.encode("123"));
         userRepository.save(user);
 
         String rawToken = refreshTokenService.createRefreshToken(user);
-
         String hash = refreshTokenService.hashToken(rawToken);
 
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
         mockMvc.perform(post("/auth/logout")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isEmpty())
-                .andExpect(jsonPath("$.refreshToken").isEmpty())
-                .andExpect(jsonPath("$.message").value("Token entfernt"));
+                .andExpect(jsonPath("$.message").value("Token entfernt"))
+                .andExpect(jsonPath("$.accessToken").value(
+                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.refreshToken").value(
+                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().maxAge("refreshToken", 0));
 
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow();
@@ -556,46 +526,30 @@ public class AuthControllerTest {
     }
 
     @Test
-    void logout_shouldReturnUnauthorized_whenTokenNotFound() throws Exception {
-
-        String rawToken = "test-refresh-token";
-
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
-
+    void logout_shouldReturnUnauthorized_whenTokenIsUnknown() throws Exception {
         mockMvc.perform(post("/auth/logout")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", "unknown-token")))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void logout_shouldReturnUnauthorized_whenTokenAlreadyRevoked() throws Exception {
-
+    void logout_shouldReturnUnauthorized_whenTokenIsAlreadyRevoked() throws Exception {
         User user = new User();
         user.setUsername("deniz");
         user.setPassword(passwordEncoder.encode("123"));
         userRepository.save(user);
 
         String rawToken = refreshTokenService.createRefreshToken(user);
-
-        String hash = refreshTokenService.hashToken(rawToken);
-        RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
-        token.setRevokedAt(Instant.now());
-        refreshTokenRepository.save(token);
-
-        String request = """
-                {
-                    "refreshToken": "%s"
-                }
-                """.formatted(rawToken);
+        refreshTokenService.revokeRefreshToken(rawToken);
 
         mockMvc.perform(post("/auth/logout")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request))
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logout_shouldReturnUnauthorized_whenRefreshTokenCookieIsMissing() throws Exception {
+        mockMvc.perform(post("/auth/logout"))
                 .andExpect(status().isUnauthorized());
     }
 

@@ -3,6 +3,7 @@ import { getNotes, createNote, deleteNote, updateNote } from "../api/notes";
 import { getCurrentUser } from "../api/auth";
 import { useNavigate } from "react-router-dom";
 import { isAdmin } from "../utils/auth";
+import API from "../api/api";
 
 function extractErrorMessage(errorData) {
   if (!errorData) return "Ein Fehler ist aufgetreten";
@@ -131,9 +132,15 @@ function Notes() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    try {
+      await API.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout fehlgeschlagen:", error.response?.data);
+    } finally {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
   };
 
   const handleAdmin = () => {
@@ -189,11 +196,10 @@ function Notes() {
               <li
                 key={note.id}
                 onClick={() => handleSelect(note)}
-                className={`p-4 rounded shadow cursor-pointer transition-colors ${
-                  selectedNote?.id === note.id
+                className={`p-4 rounded shadow cursor-pointer transition-colors ${selectedNote?.id === note.id
                     ? "bg-blue-500 text-white"
                     : "bg-white hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 <div className="flex justify-between items-center">
                   <span className="font-semibold truncate">{note.title}</span>
