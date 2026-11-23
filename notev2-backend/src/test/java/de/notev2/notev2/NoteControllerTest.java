@@ -1,3 +1,4 @@
+
 package de.notev2.notev2;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -5,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,53 +47,52 @@ public class NoteControllerTest {
     private User testuser;
 
     @BeforeEach
-void setUp() {
-    testuser = new User();
-    testuser.setUsername("deniz");
-    testuser.setPassword("123");
-    testuser.setAdmin(false); // ← hinzufügen
-    userRepository.save(testuser);
+    void setUp() {
+        testuser = new User();
+        testuser.setUsername("deniz");
+        testuser.setPassword("123");
+        testuser.setAdmin(false);
+        userRepository.save(testuser);
 
-    // UserDetails bauen wie in CustomUserDetailsService
-    UserDetails userDetails = org.springframework.security.core.userdetails.User
-            .withUsername(testuser.getUsername())
-            .password(testuser.getPassword())
-            .authorities(new SimpleGrantedAuthority("ROLE_USER"))
-            .build();
+        UserDetails userDetails = org.springframework.security.core.userdetails.User
+                .withUsername(testuser.getUsername())
+                .password(testuser.getPassword())
+                .authorities(new SimpleGrantedAuthority("ROLE_USER"))
+                .build();
 
-    validToken = jwtUtil.generateToken(userDetails); // ← UserDetails statt String
-}
+        validToken = jwtUtil.generateToken(userDetails);
+    }
 
     @Test
     void createNote_shouldReturnCreateNote() throws Exception {
 
-        
-
         String request = """
-            {
-                "title": "Testnote",
-                "content": "Das ist eine Testnote"
-            }
-            """;
+                {
+                    "title": "Testnote",
+                    "content": "Das ist eine Testnote"
+                }
+                """;
 
-            mockMvc.perform(post("/notes")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(request)
-                    .header("Authorization", "Bearer " + validToken))
-                    .andExpect(status().isCreated());
-    
+        mockMvc.perform(post("/notes")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request)
+                .header("Authorization", "Bearer " + validToken))
+                .andExpect(status().isCreated());
     }
 
     @Test
     void createNote_withoutToken_shouldReturnUnauthorized() throws Exception {
+
         String request = """
-            {
-                "title": "Testnote",
-                "content": "Das ist eine Testnote"
-            }
-            """;
+                {
+                    "title": "Testnote",
+                    "content": "Das ist eine Testnote"
+                }
+                """;
 
         mockMvc.perform(post("/notes")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isForbidden());
@@ -99,32 +100,36 @@ void setUp() {
 
     @Test
     void createNote_withInvalidToken_shouldReturnUnauthorized() throws Exception {
-       String request = """
-           {
-               "title": "Testnote",
-               "content": "Das ist eine Testnote"
-           }
-           """;
+
+        String request = """
+                {
+                    "title": "Testnote",
+                    "content": "Das ist eine Testnote"
+                }
+                """;
 
         String invalidToken = validToken + "invalid";
 
         mockMvc.perform(post("/notes")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request)
-                .header("Authorization", "Bearer " + invalidToken)) 
+                .header("Authorization", "Bearer " + invalidToken))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void createNote_withEmptyTitle_shouldReturnBadRequest() throws Exception {
+
         String request = """
-            {
-                "title": "",
-                "content": "Das ist eine Testnote"
-            }
-            """;
+                {
+                    "title": "",
+                    "content": "Das ist eine Testnote"
+                }
+                """;
 
         mockMvc.perform(post("/notes")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request)
                 .header("Authorization", "Bearer " + validToken))
@@ -134,6 +139,7 @@ void setUp() {
 
     @Test
     void getNotes_shouldReturnOk() throws Exception {
+
         mockMvc.perform(get("/notes")
                 .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk());
@@ -141,6 +147,7 @@ void setUp() {
 
     @Test
     void getNotes_withoutToken_shouldReturnUnauthorized() throws Exception {
+
         mockMvc.perform(get("/notes"))
                 .andExpect(status().isForbidden());
     }
@@ -155,6 +162,7 @@ void setUp() {
 
     @Test
     void getNotes_shouldReturnOnlyUserNotes() throws Exception {
+
         Note note = new Note();
         note.setTitle("Testnote");
         note.setContent("Das ist eine Testnote");
@@ -169,7 +177,8 @@ void setUp() {
     }
 
     @Test
-    void getNotes_shouldNotReturnOtherUsersNotes() throws Exception {   
+    void getNotes_shouldNotReturnOtherUsersNotes() throws Exception {
+
         User otherUser = new User();
         otherUser.setUsername("otheruser");
         otherUser.setPassword("123");
@@ -189,44 +198,51 @@ void setUp() {
 
     @Test
     void deleteNote_shouldReturnOk() throws Exception {
+
         Note note = new Note();
         note.setTitle("Testnote");
         note.setContent("Das ist eine Testnote");
         note.setUser(testuser);
         noteRepository.save(note);
 
-        mockMvc.perform(delete("/notes/" + note.getId() )
+        mockMvc.perform(delete("/notes/" + note.getId())
+                .with(csrf())
                 .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isNoContent());
     }
-    
+
     @Test
     void deleteNote_withoutToken_shouldReturnUnauthorized() throws Exception {
+
         Note note = new Note();
         note.setTitle("Testnote");
         note.setContent("Das ist eine Testnote");
         note.setUser(testuser);
         noteRepository.save(note);
 
-        mockMvc.perform(delete("/notes/" + note.getId() ))
+        mockMvc.perform(delete("/notes/" + note.getId())
+                .with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void deleteNote_withInvalidToken_shouldReturnUnauthorized() throws Exception {
+
         Note note = new Note();
         note.setTitle("Testnote");
         note.setContent("Das ist eine Testnote");
         note.setUser(testuser);
         noteRepository.save(note);
 
-        mockMvc.perform(delete("/notes/" + note.getId() )
+        mockMvc.perform(delete("/notes/" + note.getId())
+                .with(csrf())
                 .header("Authorization", "Bearer invalidtoken"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void deleteNote_ofAnotherUser_shouldReturnBadRequest() throws Exception {
+
         User otherUser = new User();
         otherUser.setUsername("otheruser");
         otherUser.setPassword("123");
@@ -238,8 +254,34 @@ void setUp() {
         note.setUser(otherUser);
         noteRepository.save(note);
 
-        mockMvc.perform(delete("/notes/" + note.getId() )
+        mockMvc.perform(delete("/notes/" + note.getId())
+                .with(csrf())
                 .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void createNote_withoutCsrfToken_shouldReturnForbidden() throws Exception {
+
+        String request = """
+                {
+                    "title": "Testnote",
+                    "content": "Das ist eine Testnote"
+                }
+                """;
+
+        mockMvc.perform(post("/notes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request)
+                .header("Authorization", "Bearer " + validToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getNotes_withoutCsrfToken_shouldReturnOk() throws Exception {
+
+        mockMvc.perform(get("/notes")
+                .header("Authorization", "Bearer " + validToken))
+                .andExpect(status().isOk());
     }
 }

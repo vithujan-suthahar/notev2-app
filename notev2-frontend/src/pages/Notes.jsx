@@ -43,7 +43,6 @@ function Notes() {
       const response = await getNotes();
       setNotes(response.data);
     } catch (error) {
-      console.error("Fehler beim Laden der Notes", error.response?.data);
       setError(extractErrorMessage(error.response?.data));
     }
   };
@@ -53,7 +52,6 @@ function Notes() {
       const response = await getCurrentUser();
       setUsername(response.data.message);
     } catch (error) {
-      console.error("Fehler beim Laden des Benutzers", error.response?.data);
       setError(extractErrorMessage(error.response?.data));
     }
   };
@@ -83,7 +81,6 @@ function Notes() {
       setContent(newNote.content);
       setError("");
     } catch (error) {
-      console.error("Fehler beim Erstellen der Notiz", error.response?.data);
       setError(extractErrorMessage(error.response?.data));
       setSuccess("");
     }
@@ -106,7 +103,6 @@ function Notes() {
       }, 2000);
       setError("");
     } catch (error) {
-      console.error("Fehler beim Aktualisieren der Notiz", error.response?.data);
       setError(extractErrorMessage(error.response?.data));
     }
   };
@@ -126,7 +122,6 @@ function Notes() {
       setContent("");
       setSelectedNote(null);
     } catch (error) {
-      console.error("Fehler beim Löschen der Notiz", error.response?.data);
       setError(extractErrorMessage(error.response?.data));
       setSuccess("");
     }
@@ -136,7 +131,6 @@ function Notes() {
     try {
       await API.post("/auth/logout");
     } catch (error) {
-      console.error("Logout fehlgeschlagen:", error.response?.data);
     } finally {
       localStorage.removeItem("token");
       window.location.href = "/login";

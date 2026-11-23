@@ -1,3 +1,4 @@
+
 package de.notev2.notev2;
 
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional; // WICHTIG!
+import org.springframework.transaction.annotation.Transactional;
 
 import de.notev2.notev2.entity.RefreshToken;
 import de.notev2.notev2.entity.User;
@@ -21,17 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-// Falls du ein Passwort-Encoder nutzt, aktiviere den Import:
-// import org.springframework.security.crypto.password.PasswordEncoder;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import java.time.Duration;
 import java.time.Instant;
-
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -69,6 +67,7 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isOk())
@@ -95,6 +94,7 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isUnauthorized());
@@ -111,6 +111,7 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isUnauthorized());
@@ -127,6 +128,7 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
@@ -145,6 +147,7 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
@@ -163,18 +166,20 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
                 .andExpect(jsonPath("$.errors.username").exists())
                 .andExpect(jsonPath("$.errors.password").exists());
-
     }
 
     @Test
     void login_withMaxLengthUsername_shouldReturnBadRequest() throws Exception {
+
         String username = "a".repeat(51);
+
         String request = """
                 {
                     "username": "%s",
@@ -183,6 +188,7 @@ public class AuthControllerTest {
                 """.formatted(username);
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
@@ -192,7 +198,9 @@ public class AuthControllerTest {
 
     @Test
     void login_withMaxLengthPassword_shouldReturnBadRequest() throws Exception {
+
         String password = "a".repeat(51);
+
         String request = """
                 {
                     "username": "deniz",
@@ -201,6 +209,7 @@ public class AuthControllerTest {
                 """.formatted(password);
 
         mockMvc.perform(post("/auth/login")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
@@ -219,11 +228,13 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isConflict());
@@ -231,143 +242,142 @@ public class AuthControllerTest {
 
     @Test
     void register_withEmptyUsername_shouldReturnBadRequest() throws Exception {
+
         String request = """
                 {
-                    "username" : "",
-                    "password" : "123"
+                    "username": "",
+                    "password": "123"
                 }
                 """;
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.username")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.username").exists());
     }
 
     @Test
     void register_withEmptyPassword_shouldReturnBadRequest() throws Exception {
+
         String request = """
                 {
-                    "username" : "deniz",
-                    "password" : ""
+                    "username": "deniz",
+                    "password": ""
                 }
                 """;
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.password")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
     void register_withEmptyUsernamePassword_shouldReturnBadRequest() throws Exception {
+
         String request = """
                 {
-                    "username" : "",
-                    "password" : ""
+                    "username": "",
+                    "password": ""
                 }
                 """;
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.username")
-                        .exists())
-                .andExpect(jsonPath("$.errors.password")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.username").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
     void register_withEmptyUsernameAndwithSpacesPassword_shouldReturnBadRequest() throws Exception {
+
         String request = """
                 {
-                    "username" : "",
-                    "password" : "   "
+                    "username": "",
+                    "password": "   "
                 }
                 """;
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.username")
-                        .exists())
-                .andExpect(jsonPath("$.errors.password")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.username").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
     void register_withSpacesUsernameAndwithEmptyPassword_shouldReturnBadRequest() throws Exception {
+
         String request = """
                 {
-                    "username" : "   ",
-                    "password" : ""
+                    "username": "   ",
+                    "password": ""
                 }
                 """;
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.username")
-                        .exists())
-                .andExpect(jsonPath("$.errors.password")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.username").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
     void register_withMaxLengthUsername_shouldReturnBadRequest() throws Exception {
+
         String longUsername = "a".repeat(51);
+
         String request = """
                 {
-                    "username" : "%s",
-                    "password" : "123"
+                    "username": "%s",
+                    "password": "123"
                 }
                 """.formatted(longUsername);
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.username")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.username").exists());
     }
 
     @Test
     void register_withMaxLengthPassword_shouldReturnBadRequest() throws Exception {
+
         String longPassword = "a".repeat(51);
+
         String request = """
                 {
-                    "username" : "deniz",
-                    "password" : "%s"
+                    "username": "deniz",
+                    "password": "%s"
                 }
                 """.formatted(longPassword);
+
         mockMvc.perform(post("/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("Validierung fehlgeschlagen"))
-                .andExpect(jsonPath("$.errors.password")
-                        .exists());
-
+                .andExpect(jsonPath("$.message").value("Validierung fehlgeschlagen"))
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
@@ -381,11 +391,11 @@ public class AuthControllerTest {
         String rawToken = refreshTokenService.createRefreshToken(user);
 
         mockMvc.perform(post("/auth/refresh")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").value(
-                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.message").value("Token erneuert"))
                 .andExpect(cookie().exists("refreshToken"))
                 .andExpect(cookie().httpOnly("refreshToken", true));
@@ -400,7 +410,6 @@ public class AuthControllerTest {
         userRepository.save(user);
 
         String rawToken = refreshTokenService.createRefreshToken(user);
-
         String hash = refreshTokenService.hashToken(rawToken);
 
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
@@ -408,6 +417,7 @@ public class AuthControllerTest {
         refreshTokenRepository.save(token);
 
         mockMvc.perform(post("/auth/refresh")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
 
@@ -424,7 +434,6 @@ public class AuthControllerTest {
         userRepository.save(user);
 
         String rawToken = refreshTokenService.createRefreshToken(user);
-
         String hash = refreshTokenService.hashToken(rawToken);
 
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
@@ -434,6 +443,7 @@ public class AuthControllerTest {
         Instant revokedAt = token.getRevokedAt();
 
         mockMvc.perform(post("/auth/refresh")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
 
@@ -447,6 +457,7 @@ public class AuthControllerTest {
         String rawToken = "test-raw-token";
 
         mockMvc.perform(post("/auth/refresh")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
 
@@ -462,22 +473,20 @@ public class AuthControllerTest {
         userRepository.save(user);
 
         String rawToken = refreshTokenService.createRefreshToken(user);
-
         String hash = refreshTokenService.hashToken(rawToken);
 
         MvcResult result = mockMvc.perform(post("/auth/refresh")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").value(
-                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.message").value("Token erneuert"))
                 .andExpect(cookie().exists("refreshToken"))
                 .andExpect(cookie().httpOnly("refreshToken", true))
                 .andReturn();
 
-        RefreshToken oldToken = refreshTokenRepository.findByTokenHash(hash)
-                .orElseThrow();
+        RefreshToken oldToken = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
 
         assertNotNull(oldToken.getRevokedAt());
 
@@ -489,8 +498,7 @@ public class AuthControllerTest {
 
         String newHash = refreshTokenService.hashToken(newRawToken);
 
-        RefreshToken newToken = refreshTokenRepository.findByTokenHash(newHash)
-                .orElseThrow();
+        RefreshToken newToken = refreshTokenRepository.findByTokenHash(newHash).orElseThrow();
 
         assertNotEquals(hash, newHash);
         assertEquals(user.getId(), newToken.getUser().getId());
@@ -509,31 +517,32 @@ public class AuthControllerTest {
         String hash = refreshTokenService.hashToken(rawToken);
 
         mockMvc.perform(post("/auth/logout")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Token entfernt"))
-                .andExpect(jsonPath("$.accessToken").value(
-                        org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.refreshToken").value(
-                        org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.accessToken").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(cookie().exists("refreshToken"))
                 .andExpect(cookie().maxAge("refreshToken", 0));
 
-        RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
-                .orElseThrow();
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash).orElseThrow();
 
         assertNotNull(token.getRevokedAt());
     }
 
     @Test
     void logout_shouldReturnUnauthorized_whenTokenIsUnknown() throws Exception {
+
         mockMvc.perform(post("/auth/logout")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", "unknown-token")))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void logout_shouldReturnUnauthorized_whenTokenIsAlreadyRevoked() throws Exception {
+
         User user = new User();
         user.setUsername("deniz");
         user.setPassword(passwordEncoder.encode("123"));
@@ -543,14 +552,16 @@ public class AuthControllerTest {
         refreshTokenService.revokeRefreshToken(rawToken);
 
         mockMvc.perform(post("/auth/logout")
+                .with(csrf())
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", rawToken)))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void logout_shouldReturnUnauthorized_whenRefreshTokenCookieIsMissing() throws Exception {
-        mockMvc.perform(post("/auth/logout"))
+
+        mockMvc.perform(post("/auth/logout")
+                .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
-
 }
