@@ -31,7 +31,7 @@ public class SecurityConfig {
    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, CustomUserDetailsService userDetailsService, RateLimitFilter rateLimitFilter, JwtFilter jwtFilter) throws Exception {
     http
-        .csrf(csrf -> csrf.disable())
+        .csrf(csrf -> csrf.spa())
         .cors(Customizer.withDefaults())
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(
